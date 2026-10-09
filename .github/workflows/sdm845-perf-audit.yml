@@ -1,0 +1,45 @@
+name: SDM845 perf research (read-only)
+
+on:
+  push:
+    branches:
+      - 'work/aosp17-sdm845-perf-*'
+  pull_request:
+    branches:
+      - bringup/aosp17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-audit:
+    name: Source capability audit (NOT ROM build or benchmark)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout performance audit code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Python unit tests and POSIX shell syntax
+        run: |
+          python3 -m py_compile tools/audit_sdm845_kernel_config.py tools/audit_legacy_postboot.py tests/test_sdm845_perf.py
+          sh -n tools/op6_perf_probe.sh
+          python3 -m unittest discover -s tests -p 'test_sdm845_perf.py' -v
+      - name: Audit pinned ABK 4.19 kernel defconfig
+        run: |
+          curl -fLSs --retry 3 \
+            https://raw.githubusercontent.com/ZhanfgBuild/kernel_oneplus_sdm845/bf3274c2e29d29b12c0ca7defc3269faac9d06ac/arch/arm64/configs/vendor/enchilada_defconfig \
+            -o /tmp/enchilada_defconfig
+          python3 tools/audit_sdm845_kernel_config.py /tmp/enchilada_defconfig
+      - name: Inventory pinned SDM845 legacy post-boot writes
+        run: |
+          curl -fLSs --retry 3 \
+            https://raw.githubusercontent.com/ZhanfgBuild/android_device_oneplus_sdm845-common/4dc981b799acec5862c4ad9c28a7a4b1a00e57b9/init/init.qcom.post_boot.sh \
+            -o /tmp/init.qcom.post_boot.sh
+          python3 tools/audit_legacy_postboot.py /tmp/init.qcom.post_boot.sh
+      - name: State evidence boundary
+        run: |
+          echo 'PASS only means Python/shell tests and pinned-source static checks succeeded.'
+          echo 'No ROM was compiled; no Qualcomm driver binary was installed or boot-verified.'
