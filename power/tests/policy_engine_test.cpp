@@ -52,7 +52,10 @@ int main() {
   assert(e.Evaluate(base).at(Resource::GpuMax) == 596000000);
   assert(e.Evaluate(base).at(Resource::BigMax) == 2246400);
   e.SetMode(Mode::Responsive);
-  assert(e.Evaluate(base).empty());
+  // The earlier rendering hint is no longer effective after its TTL.
+  assert(e.Evaluate(base + 300ms).empty());
+  e.Expire(base + 300ms);
+  assert(e.ActiveCount() == 0);
 
   // Never writes to /sys: this tests policy arithmetic, not an Android HAL.
   std::cout << "PASS: policy TTL, overlap, stop, modes, release and limits\n";
