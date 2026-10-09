@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Standalone Android Soong-visible policy API; no HAL service registered yet.
+cc_library_headers {
+    name: "op6_power_policy_headers",
+    vendor_available: true,
+    export_include_dirs: ["."],
+}
