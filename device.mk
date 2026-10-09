@@ -51,10 +51,13 @@ PRODUCT_COPY_FILES += \
 # during the AOSP 17 bring-up. They will be replaced with ROM-owned components
 # after the base device boots cleanly without Lineage runtime namespaces.
 
-# Power
-PRODUCT_COPY_FILES += \
-    system/core/libprocessgroup/profiles/cgroups_28.json:$(TARGET_COPY_OUT_VENDOR)/etc/cgroups.json \
-    system/core/libprocessgroup/profiles/task_profiles_28.json:$(TARGET_COPY_OUT_VENDOR)/etc/task_profiles.json
+# Power / process groups
+# Android 17 AOSP owns its modern libprocessgroup defaults. Do not copy the
+# removed Android-9 compatibility profiles (cgroups_28/task_profiles_28) into
+# vendor. A device-specific vendor overlay will be added only after its schema,
+# mount/controllers, and launch-FCM compatibility have been validated.
+# See docs/AOSP17_SDM845_PORTING_GATES.md.
+
 
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += \
