@@ -1,0 +1,48 @@
+name: AOSP17 Stage-1 performance and compatibility
+
+on:
+  push:
+    branches:
+      - 'work/aosp17-stage1-*'
+  pull_request:
+    branches:
+      - bringup/aosp17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-host:
+    name: Android 17 compatibility + Power policy host tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Stage-1 source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Parse and test Python release gates
+        run: |
+          python3 -m py_compile tools/check_aosp17_legacy.py tests/test_aosp17_legacy.py
+          python3 tools/check_aosp17_legacy.py
+          python3 -m unittest discover -s tests -p 'test_aosp17_legacy.py' -v
+      - name: Validate source-locked Stage-0 inputs
+        run: |
+          python3 tools/validate_aosp17.py
+          python3 -m unittest discover -s tests -p 'test_aosp17_preflight.py' -v
+      - name: Build and test C++ bounded-hint policy engine
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            power/tests/policy_engine_test.cpp -o /tmp/op6-policy-tests
+          /tmp/op6-policy-tests
+      - name: Inspect pinned SDM845 device VINTF manifest
+        run: |
+          curl -fLSs --retry 3 \
+            https://raw.githubusercontent.com/ZhanfgBuild/android_device_oneplus_sdm845-common/4dc981b799acec5862c4ad9c28a7a4b1a00e57b9/manifest.xml \
+            -o /tmp/op6_common_vintf.xml
+          python3 tools/check_aosp17_legacy.py --common-manifest /tmp/op6_common_vintf.xml
+      - name: Mark evidence boundary
+        run: |
+          echo 'Static manifest, source and native host checks only.'
+          echo 'Full AOSP17 Soong compile, HAL runtime, driver boot and OTA remain unverified.'
