@@ -26,8 +26,11 @@ int main() {
   assert(e.Evaluate(base + 181ms).at(Resource::BigMin) == 1459200);
   assert(e.Evaluate(base + 911ms).empty());
 
+  // Previous interaction remains independent of the launch hint.
   e.Start(Hint::Launch, base);
   e.Stop(Hint::Launch);
+  assert(e.Evaluate(base).count(Resource::BigMin) == 1);
+  e.Stop(Hint::Interaction);
   assert(e.Evaluate(base).empty());
 
   e.Start(Hint::ExpensiveRendering, base);
