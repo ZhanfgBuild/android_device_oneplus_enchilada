@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OnePlus 6 independent AOSP 17 Stage-0 local manifest.
+  Parent AOSP: android.googlesource.com/platform/manifest, android-17.0.0_r1.
+  Exact SHAs are recorded to avoid silent cross-branch updates.
+  WARNING: source sync does NOT imply a working Android 17 build.
+  Non-AOSP hardware donors here are compatibility source only; do not ship
+  Lineage framework/services or assume HAL/VINTF compatibility.
+-->
+<manifest>
+  <remote name="github-locked" fetch="https://github.com" />
+
+  <project remote="github-locked" name="ZhanfgBuild/android_device_oneplus_enchilada"
+           path="device/oneplus/enchilada" revision="aceea34006fe77e0d674c2c7ad6625d6f758ccdd" />
+  <project remote="github-locked" name="ZhanfgBuild/android_device_oneplus_sdm845-common"
+           path="device/oneplus/sdm845-common" revision="4dc981b799acec5862c4ad9c28a7a4b1a00e57b9" />
+  <project remote="github-locked" name="ZhanfgBuild/android_hardware_oneplus"
+           path="hardware/oneplus" revision="35d5611243b7b3092fcf9e7c19eff37d30ad0557" />
+  <project remote="github-locked" name="ZhanfgBuild/android_hardware_oplus"
+           path="hardware/oplus" revision="02787f5896e10991cef6e72b7907f8701b955df1" />
+
+  <!-- Legacy OxygenOS 11 proprietary blobs; Git LFS is required. -->
+  <project remote="github-locked" name="ZhanfgBuild/proprietary_vendor_oneplus_enchilada"
+           path="vendor/oneplus/enchilada" revision="2dedc8d1099e0b4d3e507c0049ee9bdcf12d77f0" />
+  <project remote="github-locked" name="ZhanfgBuild/proprietary_vendor_oneplus_sdm845-common"
+           path="vendor/oneplus/sdm845-common" revision="3d6b72f093ccfb99e8bfc17af204441b6e6322aa" />
+
+  <!-- Clean community 4.19 baseline. Does NOT contain our ABK feature patches. -->
+  <project remote="github-locked" name="ZhanfgBuild/android_kernel_oneplus_sdm845"
+           path="kernel/oneplus/sdm845" revision="f58790b8911397f6dccd1a58bcafda1c4323e478" />
+
+  <!-- Compatibility DONORS, not ROM/framework upstream. Auditing is required. -->
+  <project remote="github-locked" name="LineageOS/android_hardware_qcom-caf_common"
+           path="hardware/qcom-caf/common" revision="5cd53603d36aaddd9ba9d882dad5411f1b30fbed" />
+  <project remote="github-locked" name="LineageOS/android_device_qcom_sepolicy"
+           path="device/qcom/sepolicy" revision="d903f8e1e0c47ef5a9df528ee98203cac6de6b43" />
+  <project remote="github-locked" name="LineageOS/android_device_qcom_sepolicy_vndr"
+           path="device/qcom/sepolicy_vndr" revision="0dbc76e4b759da5681b8c96b7e2bb7c1ae0cc6b1" />
+</manifest>
