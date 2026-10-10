@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ZhanfgBuild/android_device_oneplus_sdm845-common
-          ref: bce1d15c6015a50fb22fbd16d644516132da99cd
+          ref: d0631610c5177d3cf87e2414fdd3fcf2c3789cab
           path: common-device
           persist-credentials: false
       - name: Cross-repository fstab, first-stage integration and negative safety tests
