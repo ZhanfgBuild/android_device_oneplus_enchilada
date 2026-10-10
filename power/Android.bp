@@ -19,3 +19,17 @@ cc_library_shared {
         "-Werror",
     ],
 }
+
+cc_library_static {
+    name: "libop6_power_aidl_events",
+    vendor: true,
+    srcs: ["aidl_event_adapter.cpp"],
+    export_include_dirs: ["."],
+    stl: "libc++_static",
+    cpp_std: "c++17",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+}

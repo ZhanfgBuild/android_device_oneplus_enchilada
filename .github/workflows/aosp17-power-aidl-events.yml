@@ -1,0 +1,108 @@
+name: OP6 AOSP17 AIDL event bridge
+
+on:
+  push:
+    branches: ['work/aosp17-power-aidl-events-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Compile and run host regression tests
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/op6
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -pthread \
+            power/aidl_event_adapter.cpp power/tests/aidl_event_adapter_test.cpp -o /tmp/op6/adapter-test
+          /tmp/op6/adapter-test
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            power/tests/policy_engine_test.cpp -o /tmp/op6/policy-test
+          /tmp/op6/policy-test
+          g++ -std=c++17 -O2 -fPIC -fvisibility=hidden -Werror -pthread \
+            -shared power/policy_c_api.cpp -o /tmp/op6/libop6_power_policy.so
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pthread \
+            power/tests/policy_c_api_test.cpp -L/tmp/op6 -lop6_power_policy \
+            -Wl,-rpath,/tmp/op6 -o /tmp/op6/abi-test
+          /tmp/op6/abi-test
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -pthread \
+            power/tests/policy_c_api_parallel_test.cpp -L/tmp/op6 -lop6_power_policy \
+            -Wl,-rpath,/tmp/op6 -o /tmp/op6/abi-parallel-test
+          /tmp/op6/abi-parallel-test
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            power/tests/request_reconciler_test.cpp -o /tmp/op6/reconciler-test
+          /tmp/op6/reconciler-test
+      - name: Verify AOSP 17 official Boost and Mode enum ordinals
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_aosp17_power_aidl.py' -v
+          for name in Boost Mode; do
+            curl -fLSs --retry 3 --max-time 30 \
+              "https://android.googlesource.com/platform/hardware/interfaces/+/refs/tags/android-17.0.0_r1/power/aidl/android/hardware/power/${name}.aidl?format=TEXT" \
+              -o "/tmp/op6/${name}.b64"
+            base64 --decode "/tmp/op6/${name}.b64" > "/tmp/op6/${name}.aidl"
+          done
+          python3 tools/check_aosp17_power_aidl.py \
+            /tmp/op6/Boost.aidl /tmp/op6/Mode.aidl power/aidl_event_adapter.cpp
+      - name: Build Android ARM64 shared policy and static event translator
+        run: |
+          set -euo pipefail
+          NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}"
+          if [[ -z "${NDK}" || ! -x "${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" ]]; then
+            mapfile -t ndks < <(find "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V)
+            if (( ${#ndks[@]} == 0 )); then echo "Missing Android NDK"; exit 1; fi
+            NDK="${ndks[-1]}"
+          fi
+          CC="${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p dist/op6-aidl-events-arm64
+          "${CC}/aarch64-linux-android29-clang++" -std=c++17 -O2 -fPIC -fvisibility=hidden \
+            -Wall -Wextra -Wpedantic -Werror -static-libstdc++ -shared \
+            power/policy_c_api.cpp -o dist/op6-aidl-events-arm64/libop6_power_policy.so
+          "${CC}/aarch64-linux-android29-clang++" -std=c++17 -O2 -fPIC \
+            -Wall -Wextra -Wpedantic -Werror -c \
+            power/aidl_event_adapter.cpp -o /tmp/op6/aidl_event_adapter.o
+          "${CC}/llvm-ar" rcs dist/op6-aidl-events-arm64/libop6_power_aidl_events.a \
+            /tmp/op6/aidl_event_adapter.o
+          "${CC}/llvm-readelf" -h /tmp/op6/aidl_event_adapter.o | grep 'Machine:.*AArch64'
+          "${CC}/llvm-readelf" -h dist/op6-aidl-events-arm64/libop6_power_policy.so | grep 'Machine:.*AArch64'
+          "${CC}/llvm-nm" dist/op6-aidl-events-arm64/libop6_power_aidl_events.a | grep AidlEventAdapter
+          cp power/include/op6_power_policy.h power/policy_engine.hpp power/aidl_event_adapter.hpp power/request_reconciler.hpp \
+            dist/op6-aidl-events-arm64/
+          cat > dist/op6-aidl-events-arm64/README.txt <<'NOTE'
+          OP6 AOSP17 native AArch64 proof of build; not a complete Power HAL.
+          C++ static archive translates AIDL mode/boost events, without Binder.
+          No sysfs writes; not for installation into the current Android ROM.
+          API target 29 for test only; full Soong/SELinux/VINTF unverified.
+          NOTE
+          (cd dist/op6-aidl-events-arm64 && sha256sum *.so *.a *.h *.hpp > SHA256SUMS.txt)
+      - name: Assemble source-only handoff archive
+        run: |
+          set -euo pipefail
+          mkdir -p dist/source
+          git archive --format=zip --output=dist/source/OP6_AOSP17_PowerAIDL_Stage3_Source.zip HEAD \
+            power/ tools/check_aosp17_power_aidl.py tests/test_aosp17_power_aidl.py \
+            docs/OP6_AOSP17_AIDL_EVENT_STAGE3.md \
+            .github/workflows/aosp17-power-aidl-events.yml
+          sha256sum dist/source/OP6_AOSP17_PowerAIDL_Stage3_Source.zip > dist/source/SHA256SUMS.txt
+      - name: Upload source handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: op6-aosp17-power-aidl-stage3-source
+          path: dist/source/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Upload Android ARM64 test artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: op6-aosp17-power-aidl-events-arm64
+          path: dist/op6-aidl-events-arm64/
+          retention-days: 21
+          if-no-files-found: error

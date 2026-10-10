@@ -12,7 +12,7 @@
 
 namespace op6::power {
 enum class Resource { LittleMin, BigMin, GpuMin, LittleMax, BigMax, GpuMax };
-enum class Hint { Interaction, Launch, AudioLaunch, ExpensiveRendering };
+enum class Hint { Interaction, Launch, AudioLaunch, ExpensiveRendering, DisplayUpdate };
 enum class Mode { Balanced, Responsive, Sustained, Battery };
 using Time = std::chrono::steady_clock::time_point;
 using Targets = std::map<Resource, int64_t>;
@@ -25,8 +25,12 @@ class Engine final {
   Mode GetMode() const noexcept { return mode_; }
 
   // Restart coalesces repeated events. Every transient hint expires.
-  void Start(Hint hint, Time now) {
-    const auto expiry = now + Duration(hint);
+  void Start(Hint hint, Time now) { StartFor(hint, now, Duration(hint)); }
+  // AIDL Boost accepts caller-provided durationMs; enforce a hard upper bound.
+  void StartFor(Hint hint, Time now, std::chrono::milliseconds ttl) {
+    if (ttl.count() <= 0 || ttl > std::chrono::milliseconds(5000))
+      throw std::invalid_argument("invalid boost duration");
+    const auto expiry = now + ttl;
     for (auto& active : active_) {
       if (active.hint == hint) {
         active.expires = std::max(expiry, active.expires);
@@ -70,6 +74,10 @@ class Engine final {
           Add(out, Resource::LittleMin, 748800);
           Add(out, Resource::BigMin, 1209600);
           break;
+        case Hint::DisplayUpdate:
+          Add(out, Resource::LittleMin, 748800);
+          Add(out, Resource::BigMin, 1209600);
+          break;
         case Hint::Launch:
           Add(out, Resource::LittleMin, 979200);
           Add(out, Resource::BigMin, 1459200);
@@ -96,6 +104,7 @@ class Engine final {
       case Hint::Launch: return std::chrono::milliseconds(900);
       case Hint::AudioLaunch: return std::chrono::milliseconds(600);
       case Hint::ExpensiveRendering: return std::chrono::milliseconds(250);
+      case Hint::DisplayUpdate: return std::chrono::milliseconds(90);
     }
     throw std::invalid_argument("unknown performance hint");
   }
