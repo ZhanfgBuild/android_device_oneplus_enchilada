@@ -1,0 +1,87 @@
+OnePlus 6 / uwuAOSP Android 17.0.101
+Material 3 Expressive (M3E) 源码级界面审计 v0.1
+日期：2026-10-10
+审计类型：特定 Git 提交的源码审查，不是运行时视觉测试，也不是 Google 官方认证。
+范围锁定：不修改 133 的 OTA 分支；不改内核、Boot、SystemUI APK 或 ROM 分区。
+
+一、结论（严格区分已确认和待测试）
+
+结论：有实际 M3 Expressive 实现，但不能断言系统所有页面均符合当代 Google Material 3 Expressive 规范。
+原因：Settings 有独立 Expressive 主题和按条件启用逻辑；uwuCompose 使用 Material3 ColorScheme、字体层次和分组卡片；uwuPrism 与 ThemePicker 使用部分 ExperimentalMaterial3ExpressiveApi；SystemUI 新版 QS 已使用 Compose 布局及过渡；Launcher Quickstep 具有预测性返回及动作规范。同时，共享工具栏存在明确的可访问性标签缺漏，一些新旧页面采用不同 UI 容器，个别区域有固定尺寸/本地化风险。
+
+注意：M3E 不等同“统一圆角”。评价维度包括信息层级、语义色彩、排版、容器/形状、动效连续性、触控与语义、边缘到边缘、字体放大及设备适配。View/Preference 实现不会仅因没有迁移 Compose 就自动不合规。更不能仅根据某个 import 判断页面外观合规。
+
+二、上游准确来源：官方 manifest/17.0.101.xml，不采用 moving HEAD
+官方固定清单：
+https://github.com/uwuAOSP/platform_vendor_uwu-versions/blob/main/manifest/17.0.101.xml
+
+包名 / 版本 commit / 作用：
+uwuAOSP/platform_frameworks_base 6f4edb5f7ab5c82cf40c6e05519a50e698bc0903  系统界面 SystemUI + SettingsLib
+uwuAOSP/platform_packages_apps_Settings 68031dba93c59a3eee7acae3f1a0c0d471a82867  设置主页及 SPA 页面
+uwuAOSP/platform_packages_apps_Launcher3 263331a9f9701a7ee1e74be5b95b68bb2153ad7e  桌面与最近任务、预测性返回
+uwuAOSP/platform_uwu-sdk 75c696d97527dfbf5fd89471ae6ea1a13aeee4fd  共享 uwuCompose 设置组件
+uwuAOSP/platform_packages_apps_uwuSettingsExt e06dfd1f3eefd22065880047e8568b2f60655a99  扩展设置及多类功能页面
+uwuAOSP/platform_packages_apps_uwuPrism 0984e82fdc5339f4f908f2b32c009d7c65ddeca7  OCR/Prism 界面
+uwuAOSP/platform_packages_apps_ThemePicker 9fb4e1d984f832820c6680889e1be9809a6d4ee1  主题选项、动态配色
+uwuAOSP/platform_packages_apps_WallpaperPicker2 971f244f72b0a7d3f9c6a14a5a85c3baad6beb48  壁纸页面（索引级）
+uwuAOSP/platform_vendor_uwu b63bfd159a610ef50394389c2aa291eec5fceb71  ROM 颜色、Overlay 和系统设置资源
+
+三、已确认具备的 M3E 基础能力
+
+A. 原生 Settings：源码 Settings/res/values/themes_expressive.xml 有 Theme.Settings.Expressive、Theme.Settings.Home.Expressive、Expressive 对话框和透明系统栏资源。SettingsHomepageActivity.java 第190-192行通过 SettingsThemeHelper.isExpressiveTheme(this) 有条件启用该主题，第255行 setupEdgeToEdge()。因此可认定“有 Expressive 代码通道”，但需从运行时 flags/主题确认实际正在使用该通道。
+
+B. 共享 uwuCompose：uwuCompose/SettingsTypography.kt 第56-59行使用 variable-*-emphasized 字体族；SettingsGroup.kt 通过角色色和标题字重分组；SettingsPreference.kt 第104-139行使用 surfaceBright、角色语义、至少72dp高的行；SettingsInternals.kt 第25-39行按分组位置形成20/4dp圆角；SettingsSwitch.kt 调用 Material3 Switch。上述与当代 Material 3 Expressive 的语义主题/分组容器风格相符，但并不能单独证明全局一致。
+
+C. ThemePicker：ColorVariantPicker.kt 第111行启用 ExperimentalMaterial3ExpressiveApi，第232行使用强调 typography；ColorFloatingSheet.kt 第130和236行使用 AnimatedContent。
+
+D. Prism：PrismCaptureActivity.kt 显式导入 ExperimentalMaterial3ExpressiveApi、ToggleButton、ButtonGroupDefaults；PrismTheme.kt 第31-46行使用动态色和来自共享 uwuCompose 的 rememberSettingsTypography()。
+
+E. SystemUI：packages/SystemUI/qs/composefragment/QSFragmentCompose.kt 含 Compose 和可变 SceneTransition 布局；qs/panels/ui/compose/TileDetails.kt 第122行有 animateContentSize，第173、202行定义导航动作语义。此为较新的体系，不建议因存在旧 Java 工具类就全量推倒。
+
+F. Launcher：quickstep/LauncherBackAnimationController.java 使用 BackProgressAnimator；GestureMotionSpecUtils.kt 第52行使用 spatialMotionSpec。满足“存在连续动效实现”的最低证据；是否顺滑需要真机测帧、降低动画选项测试。
+
+四、明确问题与待核验风险
+
+P0-01 可访问性：uwuCompose SettingsToolbar.kt 第153-161行在返回动作的 SettingsToolbarActionButton 调用中设置 contentDescription=null。该动作不应因只有图标而缺失对 TalkBack 有意义的“返回”/“向上导航”可本地化语义。建议添加共享可本地化语义并为可点击按钮整体设置 onClickLabel/semantics；检查 TalkBack 读取效果。（确定的源码问题；语义实际运行仍待测试）
+
+P0-02 可访问性：ThemePicker ColorFloatingSheet.kt 第251-264行有 IconButton(onClick = navigateToFreeformPicker)，其 Icon(contentDescription="")。按钮没有有效文字说明，应改用对应资源“自定义颜色”或“编辑颜色”的可本地化动作描述。（确定的源码问题）
+
+P1-01 触控命中：uwuCompose SettingsToolbar.kt 第77-94行默认外部 buttonSize=56dp、内部点击容器 containerSize=40dp。Compose 有一定最小触控范围扩展机制，故不能据此认定违反48dp；需用 Compose UI 测试验证可达48dp且多个动作间命中区域不重叠。可改为外层可点击56dp而内部视觉背景40dp，以保障视触对应。
+
+P1-02 无障碍/国际化：SystemUI TileDetails.kt 第173和202行采用硬编码英文 'Back to QS panel'、'Go to Settings'。应抽出可本地化 strings.xml；尤其针对中文 101 构建和 TalkBack。该位置并非“未标注”，问题是没有资源国际化。
+
+P1-03 页面一致性：uwuSettingsExt 的 AppJumpSettingsFragment.java 第35行继承 SettingsBasePreferenceFragment，与主扩展页面使用共享 Compose Scaffold 并存。View 页面并非天然不合 M3E；需要检查其 SettingsLib Expressive theme、层级、分组间距、搜索条、动作和列表。若经截图证实风格不一致，优先替换样式层，必要时再迁移界面，避免重写策略后端。
+
+P1-04 窄屏/横屏/大字体：uwuCompose SettingsScaffold.kt 第107行 expandedToolbarHeight=179.dp，并手动组织嵌套滚动及系统栏 inset；uwuSettingsExt MomentSettingsActivity.kt 第268行教程容器固定360dp。这些是适配风险，不能仅凭常量判定为现有故障。需要验证 200% 字体、显示大小、横屏、OnePlus 6 刘海和手势导航；检测遮挡及可滚动性。
+
+P2-01 动效一致性：各子页面使用不同动画规格和形状圆角，但基础已经采用 Material3；先建立统一 motion tokens、减弱动画（如系统开启 Reduce motion）及实际帧时间测试，再调整细节。不能凭源码缺少 spring() 字样就判定页面未实现 M3E。
+
+五、分模块判断（“部分符合”不是 Google 认证等级）
+
+Settings 主页：Expressive 实现可证；实际是否启用未确认。状态：具备基础，待真机主题验证。
+SystemUI 快捷设置：Compose/Scene 动效和 M3 色彩可证；视觉尺寸/布局/密度待对照。状态：相当程度具备，仍须视觉测试。
+uwuCompose/uwuSettingsExt：系统化组件、动态色和字体层次可证；两项触控与语义问题优先。状态：符合方向但未达完全合规。
+Launcher3：预测性返回、空间动效源码可证；新大屏与最近任务实际体验待测试。状态：部分证据。
+ThemePicker：动态色、强调字形与动画可证；按钮无障碍字符串问题。状态：部分符合。
+Prism：明确 M3 Expressive API + 动态主题；捕捉页有自定义卡片但不可据此否定。状态：具备较新实践，需真机测试。
+其他页面（WallpaperPicker、CatShare、AICore、Clocks 等）：本轮部分仅核对官方 commit 和路径，没有逐屏源码和视觉覆盖，结论“未审”，不可概括为不合规。
+
+六、建议的实施顺序与验收标准
+
+阶段 S0：维持 101 原 ROM + 已启动的 BakaSU。不要直接修改 SystemUI 或 Settings APK，不修改平台签名。
+阶段 S1（首选）：优先在 uwu-sdk 101 提交上完成 Toolbar 的 TalkBack 标签/触控验证和组件测试；再独立检查 ThemePicker 语义。
+阶段 S2：针对 AppJump、Moment、Prism、设置主页面做截图对照：浅色/深色、动态色、放大字体、手势/三键、OnePlus6刘海。
+阶段 S3：修整间距、容器、动效等，保持可配置而不强制统一过度圆角，遵从用户可理解性/性能。
+阶段 S4：按应用分模块编译；签名/权限/overlayable 规则通过后再决定可独立安装的渠道。SystemUI/Settings平台证书和EROFS不可因UI改动而放宽，暂不生成刷机包。
+
+验收门槛：每个可点控件标注语义、触控目标≥48dp（实际 hit target）、字体缩放不遮挡、无障碍状态与开关一致、颜色/高对比度不丢信息、窗口 Insets/刘海正确、动画可预测且无显著掉帧；效果通过真机截图及 UI 测试确认。
+
+七、Google 官方参考（2026-10-10 核查）
+https://developer.android.com/develop/ui/compose/designsystems/material3
+https://developer.android.com/reference/kotlin/androidx/compose/material3/
+https://developer.android.com/develop/ui/compose/accessibility/api-defaults
+https://developer.android.com/design/ui/mobile/guides/layout-and-content/layout-and-nav-patterns
+https://developer.android.com/design/ui/mobile/guides/layout-and-content/layout-basics
+https://developer.android.com/develop/ui/compose/designsystems/material2-material3
+
+本报告为源码层审计：没有声称审查仓库内全部页面，也没有声称以真机截图验证外观。部分路径只进行了目录索引，其余在相应条目逐个标出。任何未审页面不得按“通过”统计。

@@ -1,0 +1,152 @@
+{
+  "project": "OnePlus6 uwuAOSP M3 Expressive audit",
+  "target_rom": "17.0.101",
+  "target_sdk": 37,
+  "evidence_level": "pinned upstream source review; no visual screenshot verification",
+  "manifest": "https://github.com/uwuAOSP/platform_vendor_uwu-versions/blob/main/manifest/17.0.101.xml",
+  "repos": {
+    "frameworks_base": {
+      "repository": "uwuAOSP/platform_frameworks_base",
+      "commit": "6f4edb5f7ab5c82cf40c6e05519a50e698bc0903",
+      "url": "https://github.com/uwuAOSP/platform_frameworks_base/tree/6f4edb5f7ab5c82cf40c6e05519a50e698bc0903",
+      "area": "SystemUI,SettingsLib"
+    },
+    "Settings": {
+      "repository": "uwuAOSP/platform_packages_apps_Settings",
+      "commit": "68031dba93c59a3eee7acae3f1a0c0d471a82867",
+      "url": "https://github.com/uwuAOSP/platform_packages_apps_Settings/tree/68031dba93c59a3eee7acae3f1a0c0d471a82867",
+      "area": "Settings homepage,SPA"
+    },
+    "Launcher3": {
+      "repository": "uwuAOSP/platform_packages_apps_Launcher3",
+      "commit": "263331a9f9701a7ee1e74be5b95b68bb2153ad7e",
+      "url": "https://github.com/uwuAOSP/platform_packages_apps_Launcher3/tree/263331a9f9701a7ee1e74be5b95b68bb2153ad7e",
+      "area": "Launcher,Quickstep"
+    },
+    "uwu_sdk": {
+      "repository": "uwuAOSP/platform_uwu-sdk",
+      "commit": "75c696d97527dfbf5fd89471ae6ea1a13aeee4fd",
+      "url": "https://github.com/uwuAOSP/platform_uwu-sdk/tree/75c696d97527dfbf5fd89471ae6ea1a13aeee4fd",
+      "area": "uwuCompose shared UI library"
+    },
+    "uwuSettingsExt": {
+      "repository": "uwuAOSP/platform_packages_apps_uwuSettingsExt",
+      "commit": "e06dfd1f3eefd22065880047e8568b2f60655a99",
+      "url": "https://github.com/uwuAOSP/platform_packages_apps_uwuSettingsExt/tree/e06dfd1f3eefd22065880047e8568b2f60655a99",
+      "area": "custom Settings pages"
+    },
+    "uwuPrism": {
+      "repository": "uwuAOSP/platform_packages_apps_uwuPrism",
+      "commit": "0984e82fdc5339f4f908f2b32c009d7c65ddeca7",
+      "url": "https://github.com/uwuAOSP/platform_packages_apps_uwuPrism/tree/0984e82fdc5339f4f908f2b32c009d7c65ddeca7",
+      "area": "Prism screens"
+    },
+    "ThemePicker": {
+      "repository": "uwuAOSP/platform_packages_apps_ThemePicker",
+      "commit": "9fb4e1d984f832820c6680889e1be9809a6d4ee1",
+      "url": "https://github.com/uwuAOSP/platform_packages_apps_ThemePicker/tree/9fb4e1d984f832820c6680889e1be9809a6d4ee1",
+      "area": "theme/color"
+    },
+    "WallpaperPicker2": {
+      "repository": "uwuAOSP/platform_packages_apps_WallpaperPicker2",
+      "commit": "971f244f72b0a7d3f9c6a14a5a85c3baad6beb48",
+      "url": "https://github.com/uwuAOSP/platform_packages_apps_WallpaperPicker2/tree/971f244f72b0a7d3f9c6a14a5a85c3baad6beb48",
+      "area": "wallpaper screens"
+    },
+    "vendor_uwu": {
+      "repository": "uwuAOSP/platform_vendor_uwu",
+      "commit": "b63bfd159a610ef50394389c2aa291eec5fceb71",
+      "url": "https://github.com/uwuAOSP/platform_vendor_uwu/tree/b63bfd159a610ef50394389c2aa291eec5fceb71",
+      "area": "styles, RRO"
+    }
+  },
+  "source_findings": [
+    {
+      "id": "M3E-P0-001",
+      "module": "uwu-sdk",
+      "path": "uwuCompose/src/org/uwuaosp/compose/settingslib/SettingsToolbar.kt",
+      "lines": [
+        153,
+        161
+      ],
+      "finding": "interactive navigate-up icon has contentDescription=null",
+      "confidence": "source-confirmed",
+      "runtime_test_required": true
+    },
+    {
+      "id": "M3E-P0-002",
+      "module": "ThemePicker",
+      "path": "src/com/android/customization/picker/color/ui/compose/ColorFloatingSheet.kt",
+      "lines": [
+        251,
+        264
+      ],
+      "finding": "palette IconButton only icon contentDescription empty",
+      "confidence": "source-confirmed",
+      "runtime_test_required": true
+    },
+    {
+      "id": "M3E-P1-003",
+      "module": "uwu-sdk",
+      "path": "uwuCompose/src/org/uwuaosp/compose/settingslib/SettingsToolbar.kt",
+      "lines": [
+        72,
+        104
+      ],
+      "finding": "56dp exterior but 40dp clickable inner; verify hit target 48dp and overlap",
+      "confidence": "runtime-risk",
+      "runtime_test_required": true
+    },
+    {
+      "id": "M3E-P1-004",
+      "module": "frameworks_base",
+      "path": "packages/SystemUI/src/com/android/systemui/qs/panels/ui/compose/TileDetails.kt",
+      "lines": [
+        169,
+        205
+      ],
+      "finding": "hardcoded English talkback actions; internationalization",
+      "confidence": "source-confirmed",
+      "runtime_test_required": false
+    },
+    {
+      "id": "M3E-P1-005",
+      "module": "uwuSettingsExt",
+      "path": "src/org/uwuaosp/settingsext/appjump/AppJumpSettingsFragment.java",
+      "lines": [
+        25,
+        55
+      ],
+      "finding": "legacy Preference fragments coexists with Compose; visual consistency needs inspection, not intrinsically noncompliant",
+      "confidence": "architectural-observation",
+      "runtime_test_required": true
+    },
+    {
+      "id": "M3E-P1-006",
+      "module": "uwu-sdk",
+      "path": "uwuCompose/src/org/uwuaosp/compose/settingslib/SettingsScaffold.kt",
+      "lines": [
+        92,
+        185
+      ],
+      "finding": "fixed 179dp expanded toolbar and manual insets; verify zoom, notch, IME and orientation",
+      "confidence": "runtime-risk",
+      "runtime_test_required": true
+    },
+    {
+      "id": "M3E-P1-007",
+      "module": "uwuSettingsExt",
+      "path": "src/org/uwuaosp/settingsext/moment/MomentSettingsActivity.kt",
+      "lines": [
+        259,
+        279
+      ],
+      "finding": "tutorial content fixed 360dp height; verify landscape and accessibility font scaling",
+      "confidence": "runtime-risk",
+      "runtime_test_required": true
+    }
+  ],
+  "no_full_rom_needed": true,
+  "ota_133_frozen": true,
+  "flashable": false
+}
