@@ -83,6 +83,22 @@ jobs:
           API target 29 for test only; full Soong/SELinux/VINTF unverified.
           NOTE
           (cd dist/op6-aidl-events-arm64 && sha256sum *.so *.a *.h *.hpp > SHA256SUMS.txt)
+      - name: Assemble source-only handoff archive
+        run: |
+          set -euo pipefail
+          mkdir -p dist/source
+          git archive --format=zip --output=dist/source/OP6_AOSP17_PowerAIDL_Stage3_Source.zip HEAD \
+            power/ tools/check_aosp17_power_aidl.py tests/test_aosp17_power_aidl.py \
+            docs/OP6_AOSP17_AIDL_EVENT_STAGE3.md \
+            .github/workflows/aosp17-power-aidl-events.yml
+          sha256sum dist/source/OP6_AOSP17_PowerAIDL_Stage3_Source.zip > dist/source/SHA256SUMS.txt
+      - name: Upload source handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: op6-aosp17-power-aidl-stage3-source
+          path: dist/source/
+          retention-days: 21
+          if-no-files-found: error
       - name: Upload Android ARM64 test artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
