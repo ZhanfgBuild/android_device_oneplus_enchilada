@@ -1,0 +1,36 @@
+name: uwuAOSP 133 OP6 source-only OTA safety gate
+on:
+  push:
+    branches:
+      - feature/uwu133-ab-rollback-prototype
+    paths:
+      - 'uwu_enchilada.mk'
+      - 'AndroidProducts.mk'
+      - 'docs/UWU133_AB_OTA_ROLLBACK_DESIGN.md'
+      - 'tools/OP6_uwu133_AB_Rollback_Preflight_ReadOnly.sh'
+      - 'ota/REVIEW_ONLY_OTA_GATE.json'
+      - '.github/workflows/uwu133-ota-preflight.yml'
+  workflow_dispatch:
+jobs:
+  verify-design-only:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source guard and probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n tools/OP6_uwu133_AB_Rollback_Preflight_ReadOnly.sh
+          python3 -m json.tool ota/REVIEW_ONLY_OTA_GATE.json >/dev/null
+          grep -q 'UWU_RELEASE_VERSION' uwu_enchilada.mk
+          grep -Fq '$(LOCAL_DIR)/uwu_enchilada.mk' AndroidProducts.mk
+          python3 - <<'PY'
+          import json
+          d = json.load(open('ota/REVIEW_ONLY_OTA_GATE.json'))
+          assert d['source'] == '17.0.101' and d['target'] == '17.0.133'
+          assert d['source_dynamic_partitions_retrofit'] is True
+          assert d['source_system_fs'] == d['source_vendor_fs'] == d['source_odm_fs'] == 'erofs'
+          assert d['flash_ready'] is False, 'MUST FAIL CLOSED until real signed OTA gates exist'
+          assert not d['ota_keys_verified'] and not d['device_tree_retrofit_patched']
+          print('Source-only preflight PASSED; NOT flash-ready.')
+          PY

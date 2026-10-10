@@ -15,4 +15,5 @@
 #
 
 PRODUCT_MAKEFILES := \
-    $(LOCAL_DIR)/aosp_enchilada.mk
+    $(LOCAL_DIR)/aosp_enchilada.mk \
+    $(LOCAL_DIR)/uwu_enchilada.mk
