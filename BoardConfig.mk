@@ -27,3 +27,10 @@ TARGET_VENDOR_PROP += $(DEVICE_PATH)/vendor.prop
 
 # inherit from the proprietary version
 include vendor/oneplus/enchilada/BoardConfigVendor.mk
+
+# Only the *uwu_enchilada* product opts into an EROFS Retrofit Dynamic
+# profile. Other AOSP and Lineage targets keep their existing donor config.
+# This profile INTENTIONALLY fails closed until lpdump sizes are validated.
+ifeq ($(TARGET_PRODUCT),uwu_enchilada)
+include device/oneplus/sdm845-common/ota/uwu133/BoardConfigRetrofit.mk
+endif

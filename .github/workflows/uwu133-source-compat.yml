@@ -1,0 +1,36 @@
+name: OnePlus 6 uwu133 source-only device compatibility gate
+on:
+  push:
+    branches:
+      - feature/uwu133-ab-rollback-prototype
+    paths:
+      - 'uwu_enchilada.mk'
+      - 'BoardConfig.mk'
+      - 'ota/**'
+      - '.github/workflows/uwu133-source-compat.yml'
+  workflow_dispatch:
+jobs:
+  source-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Never declare OTA flash-ready without all gates
+        run: |
+          set -euo pipefail
+          python3 -m json.tool ota/RELEASE_GATES_17_0_133.json >/dev/null
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          profile=json.loads(Path('ota/RELEASE_GATES_17_0_133.json').read_text())
+          assert profile['source_rom']=='17.0.101' and profile['target_rom']=='17.0.133'
+          assert profile['dynamic_partitions']=='retrofit'
+          assert profile['filesystems']['system']=='erofs'
+          assert profile['metadata_block_device']=='logdump'
+          assert profile['flash_ready'] is False
+          p=Path('BoardConfig.mk').read_text()
+          assert 'ota/uwu133/BoardConfigRetrofit.mk' in p
+          mk=Path('uwu_enchilada.mk').read_text()
+          assert 'PRODUCT_RETROFIT_DYNAMIC_PARTITIONS := true' in mk
+          assert '17.0.133' in mk
+          print('Source-only checks PASS; flash-ready FALSE')
+          PYCODE
