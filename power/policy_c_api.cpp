@@ -4,8 +4,11 @@
 #include <chrono>
 #include <cstdint>
 #include <new>
+#include <mutex>
 
 struct op6_policy_handle {
+  // AIDL binder callbacks can be concurrent. Guard state atomically.
+  std::mutex mutex;
   op6::power::Engine engine;
 };
 namespace {
@@ -24,11 +27,13 @@ op6_policy_handle* op6_policy_create(void) {
 void op6_policy_destroy(op6_policy_handle* handle) { delete handle; }
 op6_policy_status op6_policy_reset(op6_policy_handle* handle) {
   if (!handle) return OP6_POLICY_INVALID_ARGUMENT;
+  std::lock_guard<std::mutex> guard(handle->mutex);
   handle->engine = op6::power::Engine{};
   return OP6_POLICY_OK;
 }
 op6_policy_status op6_policy_set_mode(op6_policy_handle* handle, uint32_t mode) {
   if (!handle || !ValidMode(mode)) return OP6_POLICY_INVALID_ARGUMENT;
+  std::lock_guard<std::mutex> guard(handle->mutex);
   handle->engine.SetMode(static_cast<op6::power::Mode>(mode));
   return OP6_POLICY_OK;
 }
@@ -37,12 +42,14 @@ op6_policy_status op6_policy_start(op6_policy_handle* handle, uint32_t hint,
   if (!handle || !ValidHint(hint) || !ValidTime(monotonic_ms))
     return OP6_POLICY_INVALID_ARGUMENT;
   try {
+    std::lock_guard<std::mutex> guard(handle->mutex);
     handle->engine.Start(static_cast<op6::power::Hint>(hint), At(monotonic_ms));
   } catch (...) { return OP6_POLICY_INTERNAL_ERROR; }
   return OP6_POLICY_OK;
 }
 op6_policy_status op6_policy_stop(op6_policy_handle* handle, uint32_t hint) {
   if (!handle || !ValidHint(hint)) return OP6_POLICY_INVALID_ARGUMENT;
+  std::lock_guard<std::mutex> guard(handle->mutex);
   handle->engine.Stop(static_cast<op6::power::Hint>(hint));
   return OP6_POLICY_OK;
 }
@@ -52,6 +59,7 @@ op6_policy_status op6_policy_evaluate(op6_policy_handle* handle,
   if (!handle || !result || !ValidTime(monotonic_ms))
     return OP6_POLICY_INVALID_ARGUMENT;
   try {
+    std::lock_guard<std::mutex> guard(handle->mutex);
     const auto targets = handle->engine.Evaluate(At(monotonic_ms));
     if (targets.size() > OP6_POLICY_MAX_TARGETS)
       return OP6_POLICY_INTERNAL_ERROR;
