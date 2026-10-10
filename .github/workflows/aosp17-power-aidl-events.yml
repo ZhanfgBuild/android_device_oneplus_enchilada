@@ -33,6 +33,13 @@ jobs:
             power/tests/policy_c_api_test.cpp -L/tmp/op6 -lop6_power_policy \
             -Wl,-rpath,/tmp/op6 -o /tmp/op6/abi-test
           /tmp/op6/abi-test
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror -pthread \
+            power/tests/policy_c_api_parallel_test.cpp -L/tmp/op6 -lop6_power_policy \
+            -Wl,-rpath,/tmp/op6 -o /tmp/op6/abi-parallel-test
+          /tmp/op6/abi-parallel-test
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            power/tests/request_reconciler_test.cpp -o /tmp/op6/reconciler-test
+          /tmp/op6/reconciler-test
       - name: Verify AOSP 17 official Boost and Mode enum ordinals
         run: |
           set -euo pipefail
@@ -67,7 +74,7 @@ jobs:
           "${CC}/llvm-readelf" -h /tmp/op6/aidl_event_adapter.o | grep 'Machine:.*AArch64'
           "${CC}/llvm-readelf" -h dist/op6-aidl-events-arm64/libop6_power_policy.so | grep 'Machine:.*AArch64'
           "${CC}/llvm-nm" dist/op6-aidl-events-arm64/libop6_power_aidl_events.a | grep AidlEventAdapter
-          cp power/include/op6_power_policy.h power/policy_engine.hpp power/aidl_event_adapter.hpp \
+          cp power/include/op6_power_policy.h power/policy_engine.hpp power/aidl_event_adapter.hpp power/request_reconciler.hpp \
             dist/op6-aidl-events-arm64/
           cat > dist/op6-aidl-events-arm64/README.txt <<'NOTE'
           OP6 AOSP17 native AArch64 proof of build; not a complete Power HAL.
