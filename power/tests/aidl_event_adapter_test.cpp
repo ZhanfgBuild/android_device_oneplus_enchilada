@@ -44,6 +44,8 @@ int main() {
   assert(Get(adapter.Snapshot(origin + 4999ms), Resource::BigMin) == 1056000);
   assert(adapter.Snapshot(origin + 5000ms).empty());
   assert(adapter.SetBoost(3, -1, origin));
+  // Start a fresh independent test scenario; do not rewind a live clock.
+  adapter.Reset();
 
   // Independent overlapping AIDL modes: low power overrides sustained.
   assert(adapter.SetMode(2, true, origin));
