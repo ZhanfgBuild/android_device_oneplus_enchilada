@@ -1,0 +1,89 @@
+name: OnePlus 6 uwu133 source-only device compatibility gate
+on:
+  push:
+    branches:
+      - feature/uwu133-ab-rollback-prototype
+    paths:
+      - 'uwu_enchilada.mk'
+      - 'BoardConfig.mk'
+      - 'ota/**'
+      - '.github/workflows/uwu133-source-compat.yml'
+  workflow_dispatch:
+jobs:
+  source-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Never declare OTA flash-ready without all gates
+        run: |
+          set -euo pipefail
+          python3 -m json.tool ota/RELEASE_GATES_17_0_133.json >/dev/null
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          profile=json.loads(Path('ota/RELEASE_GATES_17_0_133.json').read_text())
+          assert profile['source_rom']=='17.0.101' and profile['target_rom']=='17.0.133'
+          assert profile['dynamic_partitions']=='retrofit'
+          assert profile['filesystems']['system']=='erofs'
+          assert profile['metadata_block_device']=='logdump'
+          assert profile['flash_ready'] is False
+          p=Path('BoardConfig.mk').read_text()
+          assert 'ota/uwu133/BoardConfigRetrofit.mk' in p
+          mk=Path('uwu_enchilada.mk').read_text()
+          assert 'PRODUCT_RETROFIT_DYNAMIC_PARTITIONS := true' in mk
+          assert '17.0.133' in mk
+          print('Source-only checks PASS; flash-ready FALSE')
+          PYCODE
+      - name: Checkout pinned OnePlus 6 retrofit device-common profile
+        uses: actions/checkout@v4
+        with:
+          repository: ZhanfgBuild/android_device_oneplus_sdm845-common
+          ref: d0631610c5177d3cf87e2414fdd3fcf2c3789cab
+          path: common-device
+          persist-credentials: false
+      - name: Cross-repository fstab, first-stage integration and negative safety tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib
+          from pathlib import Path
+          src=Path('common-device/ota/uwu133/fstab.qcom')
+          rec=Path('common-device/ota/uwu133/recovery.fstab')
+          b=src.read_bytes()
+          assert hashlib.sha256(b).hexdigest() == 'a30dd64a2b48427139b0bcda5dbc50e7ce55c2af8275f4ecfccd6c22c45ce7b6'
+          assert b == rec.read_bytes()
+          rows = [v.split() for v in b.decode().splitlines() if v.strip() and not v.lstrip().startswith('#')]
+          mapped={row[1]:row for row in rows if len(row)>=5}
+          for point in ('/system','/vendor','/odm'):
+              assert mapped[point][2] == 'erofs'
+              for f in ('logical','slotselect','first_stage_mount'):
+                  assert f in mapped[point][4].split(',')
+          assert mapped['/metadata'][0] == '/dev/block/by-name/logdump'
+          assert 'fileencryption=aes-256-xts:aes-256-cts:v2' in mapped['/data'][4]
+          p=Path('uwu_enchilada.mk').read_text()
+          assert '$(filter-out fstab.qcom fstab.qcom.ramdisk,$(PRODUCT_PACKAGES))' in p
+          assert '$(TARGET_COPY_OUT_VENDOR)/etc/fstab.qcom' in p
+          assert '$(TARGET_COPY_OUT_RAMDISK)/first_stage_ramdisk/system/etc/fstab.qcom' in p
+          assert 'PRODUCT_RETROFIT_DYNAMIC_PARTITIONS := true' in p
+          print('Cross-tree EROFS/fstab source gates passed. OTA still not flash-ready.')
+          PYCODE
+          cat > _uwu133_make_gate_test.mk <<'MAKECODE'
+          TARGET_PRODUCT := uwu_enchilada
+          include common-device/ota/uwu133/BoardConfigRetrofit.mk
+          .PHONY: check
+          check:
+          	@echo profile-parsed
+          MAKECODE
+          if make -s -f _uwu133_make_gate_test.mk check > _negative.log 2>&1; then
+            echo 'SECURITY REGRESSION: OTA profile accepted missing layout metadata' >&2
+            exit 1
+          fi
+          make -s -f _uwu133_make_gate_test.mk check \
+            OP6_UWU133_LAYOUT_VERIFIED=true \
+            OP6_UWU133_SYSTEM_DEVICE_SIZE=1 \
+            OP6_UWU133_VENDOR_DEVICE_SIZE=1 \
+            OP6_UWU133_ODM_DEVICE_SIZE=1 \
+            OP6_UWU133_SUPER_PARTITION_SIZE=3 \
+            OP6_UWU133_DYNAMIC_GROUP_SIZE=2
+          echo 'Negative gate + make syntax passed (dummy sizes are CI-only, NOT device values)'
