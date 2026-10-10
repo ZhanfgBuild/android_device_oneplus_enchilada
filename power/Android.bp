@@ -1,7 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-// Standalone Android Soong-visible policy API; no HAL service registered yet.
+// Standalone policy module. Does NOT register an AIDL service or write sysfs.
 cc_library_headers {
     name: "op6_power_policy_headers",
     vendor_available: true,
-    export_include_dirs: ["."],
+    export_include_dirs: ["include"],
+}
+
+cc_library_shared {
+    name: "libop6_power_policy",
+    vendor: true,
+    srcs: ["policy_c_api.cpp"],
+    export_include_dirs: ["include"],
+    stl: "libc++_static",
+    cpp_std: "c++17",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
 }

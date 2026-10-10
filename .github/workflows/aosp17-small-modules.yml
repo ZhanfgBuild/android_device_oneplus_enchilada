@@ -1,0 +1,106 @@
+name: OP6 small native modules (host + Android ARM64)
+
+on:
+  push:
+    branches:
+      - 'work/aosp17-small-module-*'
+  pull_request:
+    branches:
+      - 'work/aosp17-stage1-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  power-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Build and run native host unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/op6_host
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            power/tests/policy_engine_test.cpp \
+            -o /tmp/op6_host/policy-engine-test
+          /tmp/op6_host/policy-engine-test
+          g++ -std=c++17 -O2 -fPIC -fvisibility=hidden \
+            -Wall -Wextra -Wpedantic -Werror \
+            -shared power/policy_c_api.cpp \
+            -o /tmp/op6_host/libop6_power_policy.so
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Werror \
+            power/tests/policy_c_api_test.cpp \
+            -L/tmp/op6_host -lop6_power_policy \
+            -Wl,-rpath,/tmp/op6_host \
+            -o /tmp/op6_host/policy-c-abi-test
+          /tmp/op6_host/policy-c-abi-test
+          nm -D --defined-only /tmp/op6_host/libop6_power_policy.so |
+            grep -E ' op6_policy_(create|destroy|evaluate|reset|set_mode|start|stop)$'
+
+      - name: Cross-compile native shared module for Android arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_DIR="${ANDROID_NDK_HOME:-${ANDROID_NDK:-}}"
+          if [[ -z "${NDK_DIR}" || ! -x "${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" ]]; then
+            mapfile -t ndks < <(find "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V)
+            if [[ "${#ndks[@]}" -eq 0 ]]; then echo "NO INSTALLED NDK"; exit 1; fi
+            NDK_DIR="${ndks[-1]}"
+          fi
+          TOOL="${NDK_DIR}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p dist/op6-power-policy-android-arm64
+          "${TOOL}/aarch64-linux-android29-clang++" \
+            -std=c++17 -O2 -fPIC -fvisibility=hidden -Wall -Wextra \
+            -Wpedantic -Werror -static-libstdc++ -shared \
+            -Wl,-z,relro,-z,now \
+            power/policy_c_api.cpp \
+            -o dist/op6-power-policy-android-arm64/libop6_power_policy.so
+          "${TOOL}/llvm-readelf" -h dist/op6-power-policy-android-arm64/libop6_power_policy.so |
+            grep 'Machine:.*AArch64'
+          "${TOOL}/llvm-readelf" -d dist/op6-power-policy-android-arm64/libop6_power_policy.so |
+            tee /tmp/op6-elf-needed.txt
+          if grep -q 'libc++_shared.so' /tmp/op6-elf-needed.txt; then
+            echo 'ERROR: unexpected external C++ runtime dependency'
+            exit 1
+          fi
+          "${TOOL}/llvm-nm" -D --defined-only dist/op6-power-policy-android-arm64/libop6_power_policy.so |
+            grep 'op6_policy_create'
+          cp power/include/op6_power_policy.h dist/op6-power-policy-android-arm64/
+          cat > dist/op6-power-policy-android-arm64/README.txt <<'NOTE'
+          OnePlus 6 AOSP17 stage-2 native proof-of-build (Android ARM64).
+          ABI: arm64-v8a; min NDK API target: 29; exports stable C entry points.
+          This is a POLICY CALCULATOR, not a ready-to-install module/APK,
+          Magisk ZIP, driver, complete AIDL Power HAL, or flashable ROM.
+          No sysfs, thermal or frequency writes and no background services.
+          Requires AOSP17 Soong/VINTF integration and on-device validation.
+          Build compiler and source commit are recorded by GitHub Actions.
+          NOTE
+          (
+            cd dist/op6-power-policy-android-arm64
+            sha256sum libop6_power_policy.so op6_power_policy.h > SHA256SUMS.txt
+          )
+
+      - name: Run migration audits (static; no ROM build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_powerhint_policy.py' -v
+          python3 -m py_compile tools/audit_powerhint_policy.py
+          python3 tools/check_aosp17_legacy.py
+          python3 -m unittest discover -s tests -p 'test_aosp17_legacy.py' -v
+          python3 -m unittest discover -s tests -p 'test_android17_memory_limiter.py' -v
+
+      - name: Upload verified Android ARM64 library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: op6-power-policy-android-arm64
+          path: dist/op6-power-policy-android-arm64/
+          retention-days: 21
+          if-no-files-found: error
