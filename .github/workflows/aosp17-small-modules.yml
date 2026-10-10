@@ -91,6 +91,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_powerhint_policy.py' -v
+          python3 -m py_compile tools/audit_powerhint_policy.py
           python3 tools/check_aosp17_legacy.py
           python3 -m unittest discover -s tests -p 'test_aosp17_legacy.py' -v
           python3 -m unittest discover -s tests -p 'test_android17_memory_limiter.py' -v
